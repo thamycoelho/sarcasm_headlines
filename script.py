@@ -1,13 +1,14 @@
 from nltk import download
 from nltk import word_tokenize
 from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
-from nltk.stem import WordNetLemmatizer
+
+from textblob import TextBlob
 from os.path import join
 import pandas as pd
-
 import re
 
 # Getting what we need from NLTK
@@ -20,8 +21,8 @@ folder = 'Dataset'
 dataset = pd.read_json(join(folder, 'Sarcasm_Headlines_Dataset_v2.json'), lines=True)
 
 # Perfectly balanced, as all things should be...
-sarcastic = dataset['is_sarcastic']==True
-legit = dataset['is_sarcastic']==False
+sarcastic = dataset[dataset['is_sarcastic']==1]
+legit = dataset[dataset['is_sarcastic']==0]
 print(f'Sarcastic: {len(sarcastic)*100/(len(sarcastic)+len(legit))}%')
 print(f'Legitimate: {len(legit)*100/(len(sarcastic)+len(legit))}%')
 
@@ -38,6 +39,13 @@ print(token_head)
 lemmatizer = WordNetLemmatizer()
 lemmatization = lambda word : lemmatizer.lemmatize(word)
 dataset.headline = dataset.headline.apply(lemmatization)
+
+# Subjectivity in sarcasm (not very usefull)
+sarcastic = dataset[dataset['is_sarcastic']==1]
+legit = dataset[dataset['is_sarcastic']==0]
+subjectivity = lambda x: TextBlob(x).sentiment.subjectivity
+sum(sarcastic.headline.apply(subjectivity))/len(sarcastic)
+sum(legit.headline.apply(subjectivity))/len(legit)
 
 # Create bag of words
 words_bags = CountVectorizer(stop_words='english')
