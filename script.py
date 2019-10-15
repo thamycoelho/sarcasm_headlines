@@ -7,6 +7,8 @@ from nltk.stem import SnowballStemmer # Stemmer of choice
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import LabelEncoder
 
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
@@ -21,20 +23,25 @@ download('stopwords')
 download('wordnet')
 download('averaged_perceptron_tagger')
 
-def big_line(text, tokenized=True, line=""):
-    for sentence in text : 
-        if tokenized : 
-            for word in sentence : 
-                line += " "+word 
-        else:
-            line += " "+sentence  
+def big_line(text, tokenized=True):
+    if tokenized : 
+        text = text.tolist()
+        line = []
+        for x in text : line += x   
+    else:
+        for x in text : line += " " + x  
     
-    return [line]
+    return line
 
 def clean_up(text, pattern="[.,:%-?()&$'\"!\“\”¯°–―—_\/|#\[\]…@ツ¡\d]"):
     # Cleanning up the data 
     clean_up = lambda txt : re.sub(pattern, '', txt)
     text = text.apply(clean_up)
+
+def onehotencoding(ids, size):
+    hotencoded = [0]*size
+    for x in ids : hotencoded[x] = 1
+    return hotencoded
 
 # Reading dataset
 folder = 'Dataset'
@@ -48,29 +55,32 @@ stemmer = SnowballStemmer('english')
 stemmezation = lambda words : [stemmer.stem(w) for w in words]
 dataset.headline = dataset.headline.apply(stemmezation)
 
-# # Lemmatizing words (preserves more meaning)
-# wnlt = WordNetLemmatizer()
-# lemmatization = lambda phrase : [wnlt.lemmatize(w) for w in phrase]
-# dataset.headline = dataset.headline.apply(lemmatization)
+# # Removing stopwords: common words that are less useful for detection (example:"the")
+# stop = set(stopwords.words('english'))
+# filt = token_head.apply(lambda row: list(filter(lambda w: w not in stop, row)))
+# dataset['headline'] = filt
 
 # Bagging words (gives a matrix with the count of each word)
 counter = CountVectorizer(stop_words='english')
 matrix = counter.fit_transform(big_line(dataset.headline))
 words = counter.get_feature_names()
-counts = matrix.toarray()
-bag = pd.DataFrame(counts, columns=words)
+# counts = matrix.toarray()
+# bag = pd.DataFrame(counts, columns=words)
 
-# POS tagging (somewhat limited by the flexibility of words)
-tagged_data = pos_tag(bag.head())
+# One Hot Encoding 
+# First we need to label the words
+labels = LabelEncoder().fit(words)
+removal = lambda words : [x for x in words if x in labels.classes_]
+dataset.headline = dataset.headline.apply(removal) # Remove words which are not labels
+encoded = dataset.headline.apply(labels.transform) # Transforming words to labels
+encoded = encoded.apply(lambda x : onehotencoding(x, len(words)))
 
-# Removing stopwords: common words that are less useful for detection (example:"the")
-stop = set(stopwords.words('english'))
-filt = token_head.apply(lambda row: list(filter(lambda w: w not in stop, row)))
-dataset['headline'] = filt
-print(filt)
-
+#### VARIBLES ####
+from numpy import array
+X = array(encoded.tolist())
+Y = array([[x] for x in dataset.is_sarcastic.tolist()]) 
 # Splitting dataset.
-X, X_test, Y, Y_test = train_test_split(dataset['headline'], dataset['is_sarcastic'], test_size=0.1)
+X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.1)
 
 print(X)
 print(Y)
@@ -81,6 +91,16 @@ print(Y)
 
 
 ##### SOME TESTED STUFF WHICH WAS DISCARDED #####
+
+#### USING PART-OF-SPEECH TAGGING ####s
+# # POS tagging (somewhat limited by the flexibility of words)
+# tagged_data = pos_tag(words)
+
+#### LEMMATIZATION INSTEAD OF STEMMING ####
+# # Lemmatizing words (preserves more meaning)
+# wnlt = WordNetLemmatizer()
+# lemmatization = lambda phrase : [wnlt.lemmatize(w) for w in phrase]
+# dataset.headline = dataset.headline.apply(lemmatization)
 
 #### CHECKING DATASET DISTRIBUTION ####
 # # Perfectly balanced, as all things should be...
