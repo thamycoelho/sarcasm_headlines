@@ -11,8 +11,8 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
 
 import matplotlib.pyplot as plt
-from wordcloud import WordCloud
-from textblob import TextBlob
+#from wordcloud import WordCloud
+#from textblob import TextBlob
 from os.path import join
 import pandas as pd
 import re
