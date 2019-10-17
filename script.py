@@ -25,82 +25,123 @@ download('stopwords')
 download('wordnet')
 download('averaged_perceptron_tagger')
 
-def big_line(text):
-    join = lambda words : " ".join(words)
-    return " ".join(list(map(join, text)))
 
-def clean_up(text, pattern="[.,:%-?()&$'\"!\“\”¯°–―—_\/|#\[\]…@ツ¡\d]"):
-    # Cleanning up the data 
-    clean_up = lambda txt : re.sub(pattern, '', txt)
-    text = text.apply(clean_up)
+###### TESTING #######################################
+def testing(headlines, labels, X, Y):
+    # Recreate headlines from encoding
+    encode_check = True
+    for i in range(len(headlines)):
+        head = set(headlines[i])
+        code = set(labels.classes_[X[i,:]==1])
+        if (head-code)!=set():
+            encode_check = False
+            break
+
+    dim_check = (Y.shape[0]==X.shape[0]) and Y.shape[1]==1 
+    dim_check = dim_check and X.shape[1]==len(labels.classes_)
+
+    print("Amount of samples:", Y.shape[0])
+    print("Amount of features:", X.shape[1])
+    print("Dimensions match?", dim_check)
+    print("Properly encoded?", encode_check)
+
+    return dim_check and encode_check
+#######################################################
+
+def clean_up(string):
+    '''Removes punctuation from a string'''
+    pattern="[.,:%-?()&$'\"!“”¯°–―—_\/|#\[\]…@ツ¡©\d]"
+    return re.sub(pattern, '', string)
+
+# Removing stopwords: common words that are less useful for detection (example:"the")
+# Should be done before stemmeing, since some stop words might not be recognized
+# after the stemmezation (doesnt happen if used lemmatization)
+def stop_words(tokens):
+    '''Removes stop words from a list of tokens'''
+    stop = set(stopwords.words('english'))
+    return list(set(tokens)-stop)
+
+# Stemming words (brute reduction of words)
+def stemmezation(tokens):
+    '''Applies stemmeing to a list of tokens'''
+    stemmer = SnowballStemmer('english')
+    return list(map(stemmer.stem, tokens))
+
+# Counting words (gives a matrix with the count of each word)
+def count_words(tokens_list):
+    '''Count number words in a list of tokens lists'''
+    # Merge all tokens into a single string
+    join = lambda words : " ".join(words)
+    big_line =  " ".join(list(map(join, tokens_list)))
+    counter = CountVectorizer()
+    matrix = counter.fit_transform([big_line])
+    words = counter.get_feature_names()
+    counts = matrix.toarray()
+    return words, counts
 
 def onehotencoding(ids, size):
+    '''One-hot encodes a list of labels (ids)'''
     hotencoded = np.zeros(shape=(size,))
     for x in ids : hotencoded[x] = 1
     return hotencoded
-
-def remove_unlabeled(sentence):
-    hit_list = ['of',',', 'is', 'on', 'rep.','9', ':', 'your']
-    for x in hit_list:
-        if x in sentence : sentence.remove(x)
-    return sentence
 
 # Reading dataset
 folder = 'Dataset'
 dataset = pd.read_json(join(folder, 'Sarcasm_Headlines_Dataset_v2.json'), lines=True)
 
 # Tokenize headlines (nltk tokenizer is more robust with punctuation)
-dataset.headline = dataset['headline'].apply(word_tokenize)
-
-# Stemming words (good reduction of words)
-stemmer = SnowballStemmer('english')
-stemmezation = lambda words : [stemmer.stem(w) for w in words]
+dataset.headline = dataset.headline.apply(clean_up)
+dataset.headline = dataset.headline.apply(word_tokenize)
+dataset.headline = dataset.headline.apply(stop_words)
 dataset.headline = dataset.headline.apply(stemmezation)
 
-# Removing stopwords: common words that are less useful for detection (example:"the")
-stop = set(stopwords.words('english'))
-filt = dataset.headline.apply(lambda row: list(filter(lambda w: w not in stop, row)))
-dataset['headline'] = filt
-
-# Bagging words (gives a matrix with the count of each word)
-counter = CountVectorizer()
-matrix = counter.fit_transform([big_line(dataset.headline)])
-words = counter.get_feature_names()
-counts = matrix.toarray()]
-
-# Create a list of insignificant words
-# (Words which appear no more than twice)
+words, counts = count_words(dataset.headline)
+# Create a list of insignificant words (Words with low frequency)
+MIN_FREQ = 3
 discard = []
 for (w,c) in zip(words, counts[0]):
-    if c <= 2 : discard.append(w)
+    if c < MIN_FREQ : discard.append(w)
+
+# Create a set with the selected words by the countvectorizer
+# and the discarded ones due to low frequency, and removes any
+# words from the headlines which dont belong to the such set
+select = set(words)-set(discard)
+dataset.headline = dataset.headline.apply(lambda x : list(set(x) & select))
 
 # One Hot Encoding 
 # First we need to label the words
-words = list(set(words)-set(discard))
-labels = LabelEncoder().fit(words)
-
+labels = LabelEncoder().fit(list(select))
 encoded = dataset.headline.apply(labels.transform) # Transforming words to labels
-print("OK")
-exit()
-# exit()
-encoded = encoded.apply(lambda x : onehotencoding(x, len(words)))
+encoded = encoded.apply(lambda x : onehotencoding(x, len(select)))
 
 #### VARIBLES ####
-from numpy import array
-X = array(encoded.tolist())
-Y = array([[x] for x in dataset.is_sarcastic.tolist()]) 
+X = np.array(encoded.tolist())
+Y = np.array([[x] for x in dataset.is_sarcastic.tolist()]) 
+testing(dataset.headline, labels, X, Y)
+
 # Splitting dataset.
 X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.1)
 
-print(X)
-print(Y)
-    
+
+
+
+
+
 
 
 
 
 
 ##### SOME TESTED STUFF WHICH WAS DISCARDED #####
+
+#### COUNT VECTORIZER ALREADY DOES THE CLEANUP ####
+# dataset.headline = dataset.headline.apply(clean_up)
+
+#### DIFFERENT METHOD FOR REMOVING STOPWORDS ####
+# # Removing stopwords: common words that are less useful for detection (example:"the")
+# stop = set(stopwords.words('english'))
+# filt = dataset.headline.apply(lambda row: list(filter(lambda w: w not in stop, row)))
+# dataset.headline = filt
 
 #### USING PART-OF-SPEECH TAGGING ####s
 # # POS tagging (somewhat limited by the flexibility of words)
