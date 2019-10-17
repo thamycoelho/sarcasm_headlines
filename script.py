@@ -17,21 +17,17 @@ from os.path import join
 import pandas as pd
 import re
 
+import numpy as np
+
 # Getting what we need from NLTK
 download('punkt')
 download('stopwords')
 download('wordnet')
 download('averaged_perceptron_tagger')
 
-def big_line(text, tokenized=True):
-    if tokenized : 
-        text = text.tolist()
-        line = []
-        for x in text : line += x   
-    else:
-        for x in text : line += " " + x  
-    
-    return line
+def big_line(text):
+    join = lambda words : " ".join(words)
+    return " ".join(list(map(join, text)))
 
 def clean_up(text, pattern="[.,:%-?()&$'\"!\“\”¯°–―—_\/|#\[\]…@ツ¡\d]"):
     # Cleanning up the data 
@@ -39,9 +35,15 @@ def clean_up(text, pattern="[.,:%-?()&$'\"!\“\”¯°–―—_\/|#\[\]…@�
     text = text.apply(clean_up)
 
 def onehotencoding(ids, size):
-    hotencoded = [0]*size
+    hotencoded = np.zeros(shape=(size,))
     for x in ids : hotencoded[x] = 1
     return hotencoded
+
+def remove_unlabeled(sentence):
+    hit_list = ['of',',', 'is', 'on', 'rep.','9', ':', 'your']
+    for x in hit_list:
+        if x in sentence : sentence.remove(x)
+    return sentence
 
 # Reading dataset
 folder = 'Dataset'
@@ -55,24 +57,32 @@ stemmer = SnowballStemmer('english')
 stemmezation = lambda words : [stemmer.stem(w) for w in words]
 dataset.headline = dataset.headline.apply(stemmezation)
 
-# # Removing stopwords: common words that are less useful for detection (example:"the")
-# stop = set(stopwords.words('english'))
-# filt = token_head.apply(lambda row: list(filter(lambda w: w not in stop, row)))
-# dataset['headline'] = filt
+# Removing stopwords: common words that are less useful for detection (example:"the")
+stop = set(stopwords.words('english'))
+filt = dataset.headline.apply(lambda row: list(filter(lambda w: w not in stop, row)))
+dataset['headline'] = filt
 
 # Bagging words (gives a matrix with the count of each word)
-counter = CountVectorizer(stop_words='english')
-matrix = counter.fit_transform(big_line(dataset.headline))
+counter = CountVectorizer()
+matrix = counter.fit_transform([big_line(dataset.headline)])
 words = counter.get_feature_names()
-# counts = matrix.toarray()
-# bag = pd.DataFrame(counts, columns=words)
+counts = matrix.toarray()]
+
+# Create a list of insignificant words
+# (Words which appear no more than twice)
+discard = []
+for (w,c) in zip(words, counts[0]):
+    if c <= 2 : discard.append(w)
 
 # One Hot Encoding 
 # First we need to label the words
+words = list(set(words)-set(discard))
 labels = LabelEncoder().fit(words)
-removal = lambda words : [x for x in words if x in labels.classes_]
-dataset.headline = dataset.headline.apply(removal) # Remove words which are not labels
+
 encoded = dataset.headline.apply(labels.transform) # Transforming words to labels
+print("OK")
+exit()
+# exit()
 encoded = encoded.apply(lambda x : onehotencoding(x, len(words)))
 
 #### VARIBLES ####
