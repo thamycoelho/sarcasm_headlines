@@ -117,12 +117,31 @@ encoded = encoded.apply(lambda x : onehotencoding(x, len(select)))
 #### VARIBLES ####
 X = np.array(encoded.tolist())
 Y = np.array([[x] for x in dataset.is_sarcastic.tolist()]) 
-testing(dataset.headline, labels, X, Y)
+# testing(dataset.headline, labels, X, Y)
 
 # Splitting dataset.
 X, X_test, Y, Y_test = train_test_split(X, Y, test_size=0.1)
 
+#### CREATING NETWORK ####
+from keras.layers import LSTM, Activation, Dense, Dropout, Input, Embedding
+from keras.models import Model
 
+def RNN(max_words = 1000, max_len = X.shape[1]):
+
+    inputs = Input(name='inputs',shape=[max_len])
+    layer = Dense(4000, name='FC1', activation='relu')(inputs)
+    layer = Dense(1000, name='FC2', activation='relu')(layer)
+    layer = Dense(250, name='FC3', activation='relu')(layer)
+    layer = Dense(50, name='FC4', activation='relu')(layer)
+    layer = Dense(1,name='out_layer')(layer)
+    layer = Activation('sigmoid')(layer)
+    model = Model(inputs=inputs,outputs=layer)
+    return model
+
+recurrent_network = RNN()
+recurrent_network.summary()
+recurrent_network.compile(loss='binary_crossentropy',optimizer='adam',metrics=['accuracy'])
+recurrent_network.fit(X,Y,batch_size=100,epochs=5, validation_split=0.1)
 
 
 
