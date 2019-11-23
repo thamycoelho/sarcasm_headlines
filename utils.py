@@ -60,7 +60,7 @@ def stop_words(tokens):
     '''Removes stop words from a list of tokens preserving their order'''
     stop = set(stopwords.words('english'))
     tok_set = set()
-    for t in tokens : tok_set.add(x)
+    for t in tokens : tok_set.add(t)
     return list(tok_set-stop)
 
 # Stemming words (brute reduction of words)
