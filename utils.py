@@ -57,9 +57,11 @@ def clean_up(string):
 # Should be done before stemmeing, since some stop words might not be recognized
 # after the stemmezation (doesnt happen if used lemmatization)
 def stop_words(tokens):
-    '''Removes stop words from a list of tokens'''
+    '''Removes stop words from a list of tokens preserving their order'''
     stop = set(stopwords.words('english'))
-    return list(set(tokens)-stop)
+    tok_set = set()
+    for t in tokens : tok_set.add(x)
+    return list(tok_set-stop)
 
 # Stemming words (brute reduction of words)
 def stemmezation(tokens):
